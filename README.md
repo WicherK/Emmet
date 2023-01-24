@@ -1,6 +1,6 @@
 
 # Emmet
-Advanced malware program written in C++, with it you can take over control of the potenatial victim's computer. For now Emmet is working only on Windows. Available features:
+Advanced malware program written in C++, with it you can take over control of the potential victim's computer. For now Emmet is working only on Windows. Available features:
 - VNC
 - Catching Keystrokes
 - Remote CMD command execution
