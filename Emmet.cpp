@@ -64,7 +64,10 @@ int main(int argc, char* argv[])
             try
             {
                 if (words.size() == 2)
-                    PressKey(words[1]);
+                {
+                    std::cout << toUpper(words[1]) << std::endl;
+                    PressKey(toUpper(words[1]));
+                }
                 else
                     client.socket()->emit("commandResult", Base64Encode("Something went wrong"));
             }

