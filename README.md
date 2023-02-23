@@ -30,8 +30,11 @@ or you can run it with parameter *-i* which will run installation process where 
 Emmet.exe -i
 ```
 
-## Known problems
-- Installation path is for now static (in future you should be able to specifie it by parameter)
+**Now from version 2.4 you can define your own destination for file.**
+```bash
+Emmet.exe -i "C:\'Program Files'\MyFolder\NewEmmet.exe"
+```
+Yes if you choose destination that includes folder with white spaces you need to put it in quotes like here: ```'Program Files'```.
 
 ## License
 
