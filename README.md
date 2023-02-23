@@ -34,8 +34,7 @@ Emmet.exe -i
 ```bash
 Emmet.exe -i "C:\'Program Files'\MyFolder\NewEmmet.exe"
 ```
-Yes if you choose destination that includes folder with white spaces you need to put it in quotes like here: 
-```'Program Files'```.
+Yes if you choose destination that includes folder with white spaces you need to put it in quotes like here.
 
 ## License
 
