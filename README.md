@@ -9,7 +9,7 @@ Advanced malware program written in C++, with it you can take over control of th
 
 ## Libraries
 I recommend to install all necessary libraries via [vcpkg](https://github.com/microsoft/vcpkg).
-- [socket.io-client-cpp](https://katherineoelsner.com/)
+- [socket.io-client-cpp](https://github.com/socketio/socket.io-client-cpp)
 - GdiPlus
 - UrlMon
 
