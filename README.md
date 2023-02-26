@@ -6,6 +6,7 @@ Advanced malware program written in C++, with it you can take over control of th
 - Remote CMD command execution
 - Self-Updater
 - Auto-Destruct
+- Playing MP3 Sound
 
 ## Libraries
 I recommend to install all necessary libraries via [vcpkg](https://github.com/microsoft/vcpkg).
